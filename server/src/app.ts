@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyCookie from '@fastify/cookie';
@@ -49,6 +50,7 @@ import { createSsrRenderer, type SsrRenderer } from './ssr.ts';
 declare module 'fastify' {
   interface FastifyRequest {
     user: User | null;
+    cspNonce: string;
   }
 }
 
@@ -117,15 +119,20 @@ export async function buildApp(
   });
 
   app.decorateRequest('user', null);
+  app.decorateRequest('cspNonce', '');
 
   app.addHook('onRequest', async (req, reply) => {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'no-referrer');
     if (config.staticDir) {
+      // The SSR-rendered page needs one inline <script> to hand hydration
+      // data to the client (see ssr.ts) — a per-request nonce lets CSP allow
+      // exactly that script without a blanket 'unsafe-inline'.
+      req.cspNonce = randomUUID();
       reply.header(
         'Content-Security-Policy',
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+        `default-src 'self'; script-src 'self' 'nonce-${req.cspNonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'`,
       );
     }
     req.user = await getUserForToken(db, req.cookies[SESSION_COOKIE]);
@@ -285,7 +292,7 @@ export async function buildApp(
       throw new HttpError(404, 'NOT_FOUND', 'Not found');
     }
     const initialData = await buildInitialData(db, req.raw.url ?? '/', req.user);
-    const html = await ssrRenderer.renderPage(req.raw.url ?? '/', initialData);
+    const html = await ssrRenderer.renderPage(req.raw.url ?? '/', initialData, req.cspNonce);
     reply.header('Content-Type', 'text/html');
     return reply.send(html);
   });
