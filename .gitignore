@@ -1,0 +1,31 @@
+# Secrets / environment
+.env
+.env.*
+!.env.example
+
+# Dependencies / build output
+node_modules/
+dist/
+
+# Local databases (e.g. a local file: libSQL DB, test artifacts)
+*.sqlite
+*.sqlite3
+*.db
+
+# Credentials / keys / certs
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Logs
+*.log
+
+# Editor / OS / tooling
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+.claude/
