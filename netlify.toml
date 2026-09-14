@@ -1,0 +1,73 @@
+# Netlify deployment for Savit. This is an alternative to the Docker/Render
+# path documented in README.md, not a replacement for it — see the
+# `netlify-deploy` branch this lives on.
+#
+# The app does real SSR (server/src/ssr.ts renders every non-API page on the
+# server, per-request), so almost everything has to go through the
+# `app` function below, not just /api/*. The redirect rules exist to carve
+# out the handful of paths that ARE real static files (built JS/CSS plus the
+# few files in client/public/) so those are served straight from Netlify's
+# CDN instead of round-tripping through the function.
+[build]
+  command = "npm run build"
+  publish = "client/dist/client"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  # entry-server.js (the SSR bundle) is only reached via a runtime-computed
+  # dynamic import in ssr.ts, so esbuild's static analysis won't find it on
+  # its own — it has to be listed explicitly or the function 500s at runtime.
+  included_files = ["client/dist/client/**", "client/dist/server/**"]
+  # Left unbundled and resolved from node_modules at runtime instead: several
+  # of these (fastify's own "avvio" dependency, @fastify/aws-lambda,
+  # @libsql/client's native bindings) call require() on Node builtins or
+  # platform-specific native addons in ways esbuild can't statically bundle —
+  # inlining them throws "Dynamic require of ... is not supported" at runtime.
+  # vite is a dev-only dependency (see ssr.ts) never reached in production.
+  external_node_modules = [
+    "fastify",
+    "@fastify/cookie",
+    "@fastify/middie",
+    "@fastify/rate-limit",
+    "@fastify/static",
+    "@fastify/aws-lambda",
+    "@libsql/client",
+    "vite",
+  ]
+
+# Built, hashed JS/CSS.
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 200
+
+# The few files in client/public/ that ship at the root instead of /assets/.
+[[redirects]]
+  from = "/icon.svg"
+  to = "/icon.svg"
+  status = 200
+
+[[redirects]]
+  from = "/icon-mark.svg"
+  to = "/icon-mark.svg"
+  status = 200
+
+[[redirects]]
+  from = "/logo.svg"
+  to = "/logo.svg"
+  status = 200
+
+[[redirects]]
+  from = "/manifest.json"
+  to = "/manifest.json"
+  status = 200
+
+# Everything else — SSR page routes and /api/* — goes to the Fastify app.
+# force = true so this wins even for "/", which would otherwise resolve to
+# the static (unrendered) index.html sitting in the publish dir.
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/app"
+  status = 200
+  force = true

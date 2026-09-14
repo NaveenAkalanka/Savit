@@ -21,6 +21,9 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
+  "dependencies": {
+    "@fastify/aws-lambda": "^6.4.1"
+  },
   "devDependencies": {
     "typescript": "^5.7.3"
   }
