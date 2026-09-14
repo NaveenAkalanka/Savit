@@ -57,7 +57,9 @@ a single unsorted list.
 
 ### Prerequisites
 
-- Node.js 22 or newer
+- Node.js 24 or newer (the server runs its TypeScript source directly via
+  Node's native type stripping — no separate compile step, but it does need
+  a recent enough Node)
 - A [Turso](https://turso.tech/) database (the free tier is enough). Create
   one with the [Turso CLI](https://docs.turso.tech/cli/installation) or their
   dashboard, and note its **database URL** and an **auth token**.
@@ -122,6 +124,32 @@ $env:SAVIT_HOST="0.0.0.0"; $env:SAVIT_STATIC_DIR="$PWD\client\dist\client"; npm 
 Put a reverse proxy (nginx, Caddy, Cloudflare Tunnel, etc.) in front of it and
 terminate TLS there if you're exposing this beyond a trusted local network —
 see [Known limitations](#known-limitations).
+
+### Run it (Docker)
+
+A multi-stage `Dockerfile` is included — it builds the client, prunes dev
+dependencies, and runs the server directly against your Turso database. The
+image is stateless (all data lives in Turso, not on the container), so no
+volume mount is needed.
+
+```bash
+cp .env.example .env   # fill in your Turso credentials first
+docker compose up -d
+```
+
+That builds the image and starts it on `http://localhost:4318`. Without
+Compose:
+
+```bash
+docker build -t savit .
+docker run -d -p 4318:4318 \
+  -e TURSO_DATABASE_URL=libsql://your-database-name.turso.io \
+  -e TURSO_AUTH_TOKEN=your-turso-auth-token \
+  --name savit savit
+```
+
+Same TLS caveat as above applies — put a reverse proxy in front of it for
+anything beyond a trusted network.
 
 ### Environment variables
 

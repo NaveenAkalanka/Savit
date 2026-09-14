@@ -6,7 +6,7 @@
   "license": "MIT",
   "author": "Naveen Akalanka",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "workspaces": [
     "shared",

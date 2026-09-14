@@ -1,6 +1,26 @@
 node_modules
 **/node_modules
 **/dist
-.env
 .git
+.github
+.claude
+.vscode
+.idea
+
+# Secrets — never end up in a build context or image layer
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
 *.log
+*.sqlite
+*.sqlite3
+*.db
+*.tsbuildinfo
+.DS_Store
+Thumbs.db

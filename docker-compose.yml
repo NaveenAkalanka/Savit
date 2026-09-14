@@ -1,0 +1,9 @@
+services:
+  savit:
+    build: .
+    ports:
+      - "4318:4318"
+    environment:
+      TURSO_DATABASE_URL: ${TURSO_DATABASE_URL}
+      TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN}
+    restart: unless-stopped
