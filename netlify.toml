@@ -18,7 +18,11 @@
   # entry-server.js (the SSR bundle) is only reached via a runtime-computed
   # dynamic import in ssr.ts, so esbuild's static analysis won't find it on
   # its own — it has to be listed explicitly or the function 500s at runtime.
-  included_files = ["client/dist/client/**", "client/dist/server/**"]
+  # client/package.json has to come along too: it's the nearest "type":
+  # "module" declaration for entry-server.js (raw ESM output from Vite), and
+  # without it Node falls back to the repo-root package.json (no "type"
+  # field) and refuses the file's `import` statements as invalid CommonJS.
+  included_files = ["client/dist/client/**", "client/dist/server/**", "client/package.json"]
   # Left unbundled and resolved from node_modules at runtime instead: several
   # of these (fastify's own "avvio" dependency, @fastify/aws-lambda,
   # @libsql/client's native bindings) call require() on Node builtins or
