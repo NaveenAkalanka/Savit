@@ -15,7 +15,11 @@ import { loadConfig } from '../../server/src/config.ts';
 import { createDb, initSchema } from '../../server/src/db.ts';
 import { buildApp } from '../../server/src/app.ts';
 
-type LambdaHandler = (event: unknown, context: unknown, callback?: unknown) => unknown;
+// Strictly 2 params (event, context) — no callback. The Node.js 24 Lambda
+// runtime inspects the handler's declared arity and rejects anything with a
+// 3rd (callback) parameter as "deprecated callback-based", even if it's
+// never invoked. See https://docs.aws.amazon.com/lambda/latest/dg/nodejs-handler.html.
+type LambdaHandler = (event: unknown, context: unknown) => unknown;
 
 // Lazily built on first invocation and cached on the module for the life of
 // this function instance (reused across warm invocations) — no top-level
@@ -36,10 +40,10 @@ async function init(): Promise<LambdaHandler> {
   return awsLambdaFastify(app) as LambdaHandler;
 }
 
-const handler: LambdaHandler = async (event, context, callback) => {
+const handler: LambdaHandler = async (event, context) => {
   handlerPromise ??= init();
   const actual = await handlerPromise;
-  return actual(event, context, callback);
+  return actual(event, context);
 };
 
 export { handler };
