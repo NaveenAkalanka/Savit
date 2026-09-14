@@ -7,15 +7,13 @@ import type { Config } from './config.ts';
 type RenderFn = (url: string, initialData: unknown) => Promise<{ html: string }>;
 
 export interface SsrRenderer {
-  renderPage(url: string, initialData: unknown): Promise<string>;
+  renderPage(url: string, initialData: unknown, nonce: string): Promise<string>;
   attachMiddleware?(app: FastifyInstance): Promise<void>;
 }
 
-const clientRoot = path.resolve(import.meta.dirname, '../../client');
-
-function injectHtml(template: string, appHtml: string, initialData: unknown): string {
+function injectHtml(template: string, appHtml: string, initialData: unknown, nonce: string): string {
   const serialized = JSON.stringify(initialData).replace(/</g, '\\u003c');
-  const dataScript = `<script>window.__INITIAL_DATA__=${serialized}</script>`;
+  const dataScript = `<script nonce="${nonce}">window.__INITIAL_DATA__=${serialized}</script>`;
   return template
     .replace('<!--ssr-outlet-->', appHtml)
     .replace('<!--ssr-initial-data-->', dataScript);
@@ -30,14 +28,18 @@ export async function createSsrRenderer(config: Config): Promise<SsrRenderer> {
     const template = fs.readFileSync(path.join(config.staticDir, 'index.html'), 'utf-8');
 
     return {
-      async renderPage(url, initialData) {
+      async renderPage(url, initialData, nonce) {
         const { html } = await mod.render(url, initialData);
-        return injectHtml(template, html, initialData);
+        return injectHtml(template, html, initialData, nonce);
       },
     };
   }
 
   // Dev: transform + execute the SSR entry on every request via Vite, no build step.
+  // Computed here (not at module scope) so bundlers that stub out import.meta
+  // outside real ESM (e.g. a CJS Lambda bundle) don't choke on it — this
+  // branch never runs in production anyway, where config.staticDir is set.
+  const clientRoot = path.resolve(import.meta.dirname, '../../client');
   const { createServer: createViteServer } = await import('vite');
   const vite = await createViteServer({
     root: clientRoot,
@@ -46,12 +48,12 @@ export async function createSsrRenderer(config: Config): Promise<SsrRenderer> {
   });
 
   return {
-    async renderPage(url, initialData) {
+    async renderPage(url, initialData, nonce) {
       const rawTemplate = fs.readFileSync(path.join(clientRoot, 'index.html'), 'utf-8');
       const template = await vite.transformIndexHtml(url, rawTemplate);
       const mod = (await vite.ssrLoadModule('/src/entry-server.tsx')) as { render: RenderFn };
       const { html } = await mod.render(url, initialData);
-      return injectHtml(template, html, initialData);
+      return injectHtml(template, html, initialData, nonce);
     },
     async attachMiddleware(app: FastifyInstance) {
       const middie = (await import('@fastify/middie')).default;
